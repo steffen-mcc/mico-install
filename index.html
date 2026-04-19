@@ -6,12 +6,13 @@
     <title>MICO Cooling Corp — Quote Builder</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4"></script>
     <!-- ── MICO Auth Guard ─────────────────────────────────────────────────── -->
     <style id="mico-auth-style">body{visibility:hidden!important}</style>
     <script>
     (async function micoAuthGuard() {
+      if (location.protocol === 'file:') { document.getElementById('mico-auth-style').remove(); return; }
       const AUTH_URL = 'https://kbqkwlhmkvwnutqkcstx.supabase.co';
       const AUTH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImticWt3bGhta3Z3bnV0cWtjc3R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMDY0ODUsImV4cCI6MjA5MTY4MjQ4NX0.Fxhi8kP391JBOMNuQvRpT7p4ssf-z5oxv-ooslrsEj4';
       const LOGIN_URL = 'https://login.micocc.net';
@@ -260,7 +261,7 @@
     <button class="nav-tab" id="tab-history" onclick="switchView('history')">Quote History</button>
     <button class="nav-tab" id="tab-admin"   onclick="switchView('admin')">Admin</button>
     <div class="nav-spacer"></div>
-    <div class="sb-badge" id="sbBadge" onclick="openModal('supabaseModal')" title="Supabase settings">
+    <div class="sb-badge" id="sbBadge" onclick="openModal('supabaseModal')" title="Cloud sync status">
         <span class="dot"></span><span id="sbLabel">Disconnected</span>
     </div>
     <span id="nav-user-email" style="font-size:11px;color:rgba(255,255,255,.5);margin-left:8px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
@@ -458,17 +459,21 @@
 </div></div>
 
 
-<!-- ══ SUPABASE MODAL ══ -->
+<!-- ══ SUPABASE STATUS MODAL ══ -->
 <div class="modal-overlay" id="supabaseModal" onclick="overlayClick(event,'supabaseModal')">
-    <div class="modal">
+    <div class="modal" style="max-width:420px">
         <button class="modal-close" onclick="closeModal('supabaseModal')">×</button>
-        <div class="modal-title">☁️ Supabase Cloud Sync</div>
-        <p style="color:var(--gray-500);font-size:13px;margin-bottom:18px;line-height:1.6">Connect to your Supabase project to sync quotes across devices.</p>
+        <div class="modal-title">☁️ Cloud Sync Status</div>
         <div style="display:flex;flex-direction:column;gap:14px">
-            <div class="form-group"><label>Supabase Project URL</label><input type="text" id="sb_url" placeholder="https://xxxxxxxxxxxx.supabase.co"></div>
-            <div class="form-group"><label>Anon / Public Key</label><input type="password" id="sb_key" placeholder="eyJhbGciOiJIUzI1NiIs…"></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--gray-100);border:1px solid var(--silver-light);border-radius:8px">
+                <span id="sbModalDot" style="width:10px;height:10px;border-radius:50%;background:var(--green);flex-shrink:0"></span>
+                <div>
+                    <div style="font-size:12px;font-weight:700;color:var(--navy)" id="sbModalStatus">Connected</div>
+                    <div style="font-size:11px;color:var(--gray-500);margin-top:2px">qdgvmjfxsefeqksmolpw.supabase.co</div>
+                </div>
+            </div>
             <div class="sb-setup-box">
-                <div style="font-size:11px;font-weight:700;color:var(--navy-mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Required table — run once in Supabase SQL Editor</div>
+                <div style="font-size:11px;font-weight:700;color:var(--navy-mid);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Required table schema</div>
                 <pre id="sbSql" style="font-size:11px;background:var(--gray-100);border:1px solid var(--silver-light);border-radius:6px;padding:10px;overflow-x:auto;white-space:pre;margin:0;line-height:1.6;color:var(--gray-700)">create table if not exists projects (
   id text primary key,
   name text,
@@ -479,12 +484,6 @@
 alter table projects enable row level security;
 create policy "allow all" on projects for all using (true) with check (true);</pre>
                 <button class="btn btn-charcoal btn-sm" style="margin-top:8px;font-size:11px" onclick="navigator.clipboard.writeText($('sbSql').textContent).then(()=>toast('SQL copied!','ok'))">Copy SQL</button>
-                <div id="sbTestResult" style="margin-top:10px;font-size:12px;display:none"></div>
-            </div>
-            <div style="display:flex;gap:10px">
-                <button class="btn btn-charcoal" style="flex:1;justify-content:center" onclick="saveSupabaseConfig()">Connect</button>
-                <button class="btn btn-charcoal" style="flex:1;justify-content:center" onclick="testSupabase()">Test</button>
-                <button class="btn btn-charcoal" style="flex:1;justify-content:center;color:var(--red);border-color:var(--red)" onclick="clearSupabaseConfig()">Disconnect</button>
             </div>
         </div>
     </div>
@@ -509,53 +508,20 @@ create policy "allow all" on projects for all using (true) with check (true);</p
 // ═══════════════════════════════════════
 // SUPABASE
 // ═══════════════════════════════════════
+const SB_URL = 'https://qdgvmjfxsefeqksmolpw.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkZ3ZtamZ4c2VmZXFrc21vbHB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODEwOTUsImV4cCI6MjA5MTg1NzA5NX0.0xjZYGiNae21R6XfrRreTYqpO3Z2_Fox8tWpnvdj50A';
+
 let sbClient = null;
 function initSupabase() {
-    if (!localStorage.getItem('mico_sb_cfg')) {
-        localStorage.setItem('mico_sb_cfg', JSON.stringify({
-            url: 'https://qdgvmjfxsefeqksmolpw.supabase.co',
-            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkZ3ZtamZ4c2VmZXFrc21vbHB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODEwOTUsImV4cCI6MjA5MTg1NzA5NX0.0xjZYGiNae21R6XfrRreTYqpO3Z2_Fox8tWpnvdj50A'
-        }));
-    }
-    const cfg = JSON.parse(localStorage.getItem('mico_sb_cfg') || 'null');
-    if (!cfg?.url || !cfg?.key) return;
     try {
-        sbClient = supabase.createClient(cfg.url, cfg.key);
+        sbClient = supabase.createClient(SB_URL, SB_KEY);
         $('sbBadge').className = 'sb-badge connected';
         $('sbLabel').textContent = 'Connected';
-        $('sb_url').value = cfg.url;
-        $('sb_key').value = cfg.key;
-    } catch(e) { sbClient = null; }
-}
-function saveSupabaseConfig() {
-    const url=$('sb_url').value.trim(), key=$('sb_key').value.trim();
-    if (!url||!key) { toast('Enter both URL and key','err'); return; }
-    localStorage.setItem('mico_sb_cfg', JSON.stringify({url,key}));
-    initSupabase(); closeModal('supabaseModal'); toast('Supabase connected ☁️','ok');
-}
-function clearSupabaseConfig() {
-    localStorage.removeItem('mico_sb_cfg'); sbClient=null;
-    $('sbBadge').className='sb-badge'; $('sbLabel').textContent='Disconnected';
-    closeModal('supabaseModal'); toast('Disconnected');
-}
-
-function testSupabase() {
-    if (!sbClient) { toast('Not connected — enter credentials first','err'); return; }
-    const el = $('sbTestResult');
-    el.style.display='block'; el.style.color='var(--gray-500)'; el.textContent='Testing…';
-    sbClient.from('projects').select('id').limit(1)
-        .then(({data,error}) => {
-            if (error) {
-                el.style.color='var(--red)';
-                el.textContent='✗ Error: '+error.message;
-            } else {
-                el.style.color='var(--green)';
-                el.textContent='✓ Connection OK — projects table found';
-            }
-        }).catch(e => {
-            el.style.color='var(--red)';
-            el.textContent='✗ '+e.message;
-        });
+    } catch(e) {
+        sbClient = null;
+        $('sbBadge').className = 'sb-badge';
+        $('sbLabel').textContent = 'Disconnected';
+    }
 }
 
 // ═══════════════════════════════════════
