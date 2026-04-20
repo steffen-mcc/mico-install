@@ -359,10 +359,11 @@
     <button class="nav-tab active" id="tab-builder" onclick="switchView('builder')">Quote Builder</button>
     <button class="nav-tab" id="tab-history" onclick="switchView('history')">Quote History</button>
     <button class="nav-tab" id="tab-admin"   onclick="switchView('admin')">Admin</button>
-    <div class="nav-spacer"></div>
-    <div class="conn-indicator" id="conn-indicator"><span class="conn-dot"></span><span class="conn-lbl">Connecting…</span></div>
-    <span id="nav-user-email" style="font-size:11px;color:rgba(255,255,255,.5);margin-left:8px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-    <button onclick="micoSignOut()" style="margin-left:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.75);font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;letter-spacing:.2px;">Sign Out</button>
+    <div class="nav-right" style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+      <div class="conn-indicator" id="conn-indicator"><span class="conn-dot"></span><span class="conn-lbl">Connecting…</span></div>
+      <span id="nav-user-email" style="font-size:11px;color:rgba(255,255,255,.5);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+      <button onclick="micoSignOut()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.75);font-size:12px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;letter-spacing:.2px;">Sign Out</button>
+    </div>
 </nav>
 
 <!-- ══ QUOTE BUILDER ══ -->
@@ -374,7 +375,7 @@
             <span class="card-title">Quote Information</span>
             <div class="card-header-actions">
                 <button class="btn btn-charcoal btn-sm" onclick="newProject()">＋ New Quote</button>
-                <button class="btn btn-gold btn-sm"    onclick="saveProject()">💾 Save</button>
+                <button class="btn btn-gold btn-sm"    onclick="saveProject()">Save</button>
             </div>
         </div>
         <div class="header-grid">
@@ -592,12 +593,7 @@
         <div class="history-list-card">
             <div class="history-list-header">
                 <div class="card-title">Saved Quotes</div>
-                <button class="btn btn-charcoal btn-sm" id="syncBtn" onclick="syncFromCloud()" title="Pull latest quotes from Supabase">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                    Sync
-                </button>
             </div>
-            <div id="syncStatus" style="font-size:11px;padding:0 14px 6px;color:var(--gray-500);display:none"></div>
             <div class="hist-search-wrap">
                 <div class="hist-search-container">
                     <svg class="hist-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -626,28 +622,28 @@
     <div class="card" style="max-width:700px">
         <div class="card-header">
             <span class="card-title">Default Settings</span>
-            <button class="btn btn-gold btn-sm" onclick="saveAdminSettings()">Save Defaults</button>
+            <span id="admin-save-status" style="font-size:12px;font-weight:500"></span>
         </div>
 
         <div class="section-title">⚡ Labor</div>
         <div class="admin-grid">
-            <div class="form-group"><label>Default Cost / Hr</label><input type="text" inputmode="decimal" id="admin_laborRate" placeholder="e.g. 85.00" onblur="fmtField(this)"></div>
-            <div class="form-group"><label>Default Mark-Up Factor</label><input type="number" id="admin_laborMarkup" placeholder="0.65" min="0.01" max="1" step="0.01" onblur="if(this.value)this.value=parseFloat(this.value).toFixed(2)"></div>
-            <div class="form-group"><label>OT Threshold (hrs / tech)</label><input type="number" id="admin_otThreshold" placeholder="8" min="1" step="0.5"></div>
+            <div class="form-group"><label>Default Cost / Hr</label><input type="text" inputmode="decimal" id="admin_laborRate" placeholder="e.g. 85.00" onblur="fmtField(this)" onchange="scheduleAdminSave()"></div>
+            <div class="form-group"><label>Default Mark-Up Factor</label><input type="number" id="admin_laborMarkup" placeholder="0.65" min="0.01" max="1" step="0.01" onblur="if(this.value)this.value=parseFloat(this.value).toFixed(2)" onchange="scheduleAdminSave()"></div>
+            <div class="form-group"><label>OT Threshold (hrs / tech)</label><input type="number" id="admin_otThreshold" placeholder="8" min="1" step="0.5" onchange="scheduleAdminSave()"></div>
         </div>
 
         <div class="section-title" style="margin-top:26px">🔧 Materials</div>
         <div class="admin-grid">
-            <div class="form-group"><label>Default Mark-Up Factor</label><input type="number" id="admin_materialMarkup" placeholder="0.65" min="0.01" max="1" step="0.01" onblur="if(this.value)this.value=parseFloat(this.value).toFixed(2)"></div>
+            <div class="form-group"><label>Default Mark-Up Factor</label><input type="number" id="admin_materialMarkup" placeholder="0.65" min="0.01" max="1" step="0.01" onblur="if(this.value)this.value=parseFloat(this.value).toFixed(2)" onchange="scheduleAdminSave()"></div>
         </div>
 
         <div class="section-title" style="margin-top:26px">🏗️ Sub-Contractors</div>
         <div class="admin-grid">
-            <div class="form-group"><label>Default Mark-Up Factor</label><input type="number" id="admin_subMarkup" placeholder="0.65" min="0.01" max="1" step="0.01" onblur="if(this.value)this.value=parseFloat(this.value).toFixed(2)"></div>
+            <div class="form-group"><label>Default Mark-Up Factor</label><input type="number" id="admin_subMarkup" placeholder="0.65" min="0.01" max="1" step="0.01" onblur="if(this.value)this.value=parseFloat(this.value).toFixed(2)" onchange="scheduleAdminSave()"></div>
         </div>
 
         <div class="section-title" style="margin-top:26px">📋 Proposal Exclusions</div>
-        <p style="font-size:12px;color:var(--gray-500);margin-bottom:12px;line-height:1.6">These exclusions appear as checkboxes when generating a client proposal. Reorder by deleting and re-adding. Changes are saved with the button above.</p>
+        <p style="font-size:12px;color:var(--gray-500);margin-bottom:12px;line-height:1.6">These exclusions appear as checkboxes when generating a client proposal. Reorder by deleting and re-adding. Changes save automatically.</p>
         <div class="admin-exclusions-list" id="adminExclusionsList"></div>
         <div class="admin-excl-add-row">
             <input type="text" id="newExclusionInput" placeholder="Add a new exclusion…" onkeydown="if(event.key==='Enter')addAdminExclusion()">
@@ -670,7 +666,7 @@
             <button class="btn btn-charcoal btn-sm" onclick="addTemplate()" style="align-self:flex-start">＋ Add Template</button>
         </div>
 
-        <p class="admin-note">Saving defaults updates the mark-up factors on the current open quote and sets the OT threshold used for all labor calculations. The default Cost / Hr pre-fills new labor rows.</p>
+        <p class="admin-note">Changes save automatically. Mark-up factors and OT threshold update immediately on the current open quote. The default Cost / Hr pre-fills new labor rows.</p>
     </div>
 </div></div>
 
@@ -1212,6 +1208,7 @@ function initTemplateDrag(list) {
             lib.splice(targetIdx, 0, moved);
             _dragSrcIdx = null;
             renderAdminTemplates();
+            scheduleAdminSave();
         });
     });
 }
@@ -1230,12 +1227,14 @@ function updateTemplate(idx, field, value) {
                 : '<em>No [fields] detected yet</em>';
         }
         renderTemplateSelector();
+        scheduleAdminSave();
     }
 }
 
 function deleteTemplate(idx) {
     adminSettings.templateLibrary.splice(idx, 1);
     renderAdminTemplates();
+    scheduleAdminSave();
 }
 
 function addTemplate() {
@@ -1249,7 +1248,7 @@ function addTemplate() {
     const items=$('adminTemplateList').querySelectorAll('.admin-tmpl-item');
     const last=items[items.length-1];
     if (last) { last.scrollIntoView({behavior:'smooth',block:'nearest'}); last.querySelector('.admin-tmpl-name-input')?.focus(); }
-    toast('Template added — save defaults to persist','ok');
+    scheduleAdminSave();
 }
 
 function renderTemplateSelector() {
@@ -1338,10 +1337,12 @@ function addAdminExclusion() {
     adminSettings.exclusions = [...(adminSettings.exclusions||[]), val];
     inp.value = '';
     renderAdminExclusions();
+    scheduleAdminSave();
 }
 function deleteAdminExclusion(idx) {
     adminSettings.exclusions = (adminSettings.exclusions||[]).filter((_,i)=>i!==idx);
     renderAdminExclusions();
+    scheduleAdminSave();
 }
 function loadAdminSettings() {
     // Load from localStorage immediately (fast)
@@ -1363,7 +1364,21 @@ async function loadAdminFromCloud() {
     } catch(e) { /* cloud unavailable, local values already applied */ }
 }
 
-async function saveAdminSettings() {
+let _adminSaveTimer = null;
+function scheduleAdminSave() {
+    const el = $('admin-save-status');
+    if (el) { el.style.color = 'var(--gray-400)'; el.textContent = 'saving…'; }
+    clearTimeout(_adminSaveTimer);
+    _adminSaveTimer = setTimeout(() => saveAdminSettings(true), 2000);
+}
+function setAdminSaveStatus(state) {
+    const el = $('admin-save-status');
+    if (!el) return;
+    if (state === 'ok')  { el.style.color = '#22c55e'; el.textContent = 'saved ✓'; setTimeout(() => { el.textContent = ''; }, 3000); }
+    else if (state === 'err') { el.style.color = '#f87171'; el.textContent = 'not saved'; }
+}
+
+async function saveAdminSettings(silent = false) {
     adminSettings = {
         laborRate:      parseFloat($('admin_laborRate').value)      || adminSettings.laborRate || 90,
         laborMarkup:    parseFloat($('admin_laborMarkup').value)    ?? 0.65,
@@ -1389,12 +1404,15 @@ async function saveAdminSettings() {
                 updated_at: new Date().toISOString()
             });
             if (error) throw error;
-            toast('Defaults saved for all devices ☁️','ok');
+            if (!silent) toast('Defaults saved for all devices ☁️','ok');
+            setAdminSaveStatus('ok');
         } catch(e) {
-            toast('Saved locally (cloud error: '+(e?.message||e)+')','err');
+            if (!silent) toast('Saved locally (cloud error: '+(e?.message||e)+')','err');
+            setAdminSaveStatus('err');
         }
     } else {
-        toast('Defaults saved locally','ok');
+        if (!silent) toast('Defaults saved locally','ok');
+        setAdminSaveStatus('ok');
     }
 }
 
@@ -1444,7 +1462,14 @@ function setAutoSaveStatus(state) {
     else if (state==='err') { el.style.display='inline-flex'; el.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> not saved'; el.style.color='rgba(248,113,113,.9)'; }
 }
 async function autoSaveToCloud() {
-    if (!sbClient || !currentId) return;
+    if (!sbClient) return;
+    // For brand-new quotes (no currentId), only auto-save once there's a client name or WO#
+    // to avoid filling history with empty/Untitled records
+    if (!currentId) {
+        const h = getHeader();
+        if (!h.name.trim() && !h.wo.trim()) return;
+        currentId = uid();  // assign a permanent ID now
+    }
     const data=snapshot();
     let projects=localProjects();
     const idx=projects.findIndex(p=>p.id===data.id);
@@ -1537,9 +1562,6 @@ const safe  = s  => (s||'Quote').replace(/[^a-zA-Z0-9_\- ]/g,'').replace(/\s+/g,
 async function syncFromCloud() {
     renderHistoryList(); // show local immediately
     if (!sbClient) return; // offline, local only
-    const btn=$('syncBtn'), status=$('syncStatus');
-    if(btn){ btn.disabled=true; btn.style.opacity='.6'; }
-    if(status){ status.style.display='block'; status.textContent='Syncing from cloud…'; }
     try {
         const {data,error}=await sbClient.from('projects').select('id,name,data,updated_at').order('updated_at',{ascending:false});
         if (error) throw error;
@@ -1561,16 +1583,9 @@ async function syncFromCloud() {
             local.sort((a,b)=>new Date(b.updatedAt||b.createdAt||0)-new Date(a.updatedAt||a.createdAt||0));
             saveLocals(local);
             renderHistoryList();
-            if(status){ status.textContent=`Synced — ${data.length} quote${data.length!==1?'s':''} from cloud`; }
-            setTimeout(()=>{ if(status) status.style.display='none'; },3000);
-        } else {
-            if(status){ status.textContent='No cloud quotes found'; setTimeout(()=>{ status.style.display='none'; },2000); }
         }
     } catch(e) {
         console.error('Sync error:',e);
-        if(status){ status.style.color='var(--red)'; status.textContent='Sync failed: '+(e?.message||e); setTimeout(()=>{ status.style.display='none'; status.style.color='var(--gray-500)'; },4000); }
-    } finally {
-        if(btn){ btn.disabled=false; btn.style.opacity='1'; }
     }
 }
 
@@ -1669,13 +1684,20 @@ function selectHistory(id) {
 }
 
 function confirmDeleteHistory(id) {
-    confirm2('Delete this quote?','This cannot be undone.',()=>{
+    confirm2('Delete this quote?','This cannot be undone.', async ()=>{
+        // Remove from localStorage immediately
         saveLocals(localProjects().filter(p=>p.id!==id));
         if (selectedHistId===id) {
             selectedHistId=null;
             $('previewPanel').innerHTML=`<div class="preview-empty"><div class="preview-empty-icon">👈</div><p style="font-size:15px;font-weight:600;color:var(--navy-mid)">Select a quote to preview</p></div>`;
         }
-        renderHistoryList(); toast('Quote deleted');
+        renderHistoryList();
+        // Also delete from Supabase so sync doesn't resurrect it
+        if (sbClient) {
+            const { error } = await sbClient.from('projects').delete().eq('id', id);
+            if (error) console.warn('Cloud delete failed:', error.message);
+        }
+        toast('Quote deleted');
     });
 }
 
@@ -1684,6 +1706,8 @@ function confirmDeleteHistory(id) {
 // COST SHEET (internal HTML/print)
 // ═══════════════════════════════════════
 function previewCostSheet() {
+    // Save first so this quote always appears in history
+    saveProject();
     const h = getHeader();
     const s = getSettings();
     const thresh = adminSettings.otThreshold || 8;
@@ -2132,6 +2156,8 @@ function openProposalModal() {
 }
 
 async function buildProposal() {
+    // Save first so this quote always appears in history
+    await saveProject();
     // ── CALCULATIONS ─────────────────────────────────────────────────────────
     const h = getHeader();
     const s = getSettings();
