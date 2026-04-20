@@ -1521,20 +1521,23 @@ function loadProject(p) {
 }
 
 function newProject() {
-    confirm2('Start a new quote?','Unsaved changes will be lost.',()=>{
-        currentId=null;
-        setHeader({});
-        setSettings({laborMarkup:adminSettings.laborMarkup,materialMarkup:adminSettings.materialMarkup,taxRate:0});
-        $('pricingOverridePanel').style.display='none';
-        $('pricingToggleBtn').classList.remove('active');
-        materialItems=[]; $('materialsBody').innerHTML='';
-        laborDays=[]; $('laborBody').innerHTML='';
-        subItems=[]; $('subBody').innerHTML='';
-        noteItems=[]; $('notesList').innerHTML='';
-        $('h_date').value=today();
-        syncVis('materialsTable','materialsEmpty',materialItems);
-        syncLaborVis(); syncNotesVis(); recalc();
-    });
+    confirm2('Start a new quote?','Unsaved changes will be lost.',()=>{ resetToNew(); });
+}
+
+function resetToNew() {
+    currentId=null;
+    setHeader({});
+    setSettings({laborMarkup:adminSettings.laborMarkup,materialMarkup:adminSettings.materialMarkup,taxRate:0});
+    $('pricingOverridePanel').style.display='none';
+    $('pricingToggleBtn').classList.remove('active');
+    materialItems=[]; $('materialsBody').innerHTML='';
+    laborDays=[]; $('laborBody').innerHTML='';
+    subItems=[]; $('subBody').innerHTML='';
+    noteItems=[]; $('notesList').innerHTML='';
+    $('h_date').value=today();
+    syncVis('materialsTable','materialsEmpty',materialItems);
+    syncLaborVis(); syncNotesVis(); recalc();
+    switchView('builder');
 }
 
 // ═══════════════════════════════════════
@@ -2445,6 +2448,19 @@ function init() {
     syncLaborVis();
     recalc();
     renderTemplateSelector();
+
+    // Logo → silent reset to blank builder
+    const logo = document.querySelector('.nav-logo-img');
+    if (logo) { logo.style.cursor='pointer'; logo.title='New Quote'; logo.addEventListener('click', resetToNew); }
+
+    // Realtime — keep history live as others save
+    if (sbClient) {
+        sbClient.channel('install_projects_live')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+                syncFromCloud();
+            })
+            .subscribe();
+    }
 }
 init();
 
