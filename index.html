@@ -844,6 +844,7 @@ const DEFAULT_TEMPLATE_LIBRARY = [
       text:'All equipment and installation work carries a [Warranty Period] labor warranty from the date of substantial completion. Equipment manufacturer warranties apply and will be registered upon installation.' },
 ];
 let adminSettings = { laborRate:90, laborMarkup:0.65, materialMarkup:0.65, subMarkup:0.65, otThreshold:8, exclusions:[...DEFAULT_EXCLUSIONS], templateLibrary:[...DEFAULT_TEMPLATE_LIBRARY] };
+let cloudProjects = []; // in-memory store — Supabase is the only source of truth
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 const $   = id => document.getElementById(id);
@@ -1345,11 +1346,8 @@ function deleteAdminExclusion(idx) {
     scheduleAdminSave();
 }
 function loadAdminSettings() {
-    // Load from localStorage immediately (fast)
-    const s = JSON.parse(localStorage.getItem('mico_admin')||'null');
-    applyAdminSettings(s || adminSettings);
-    // Then try to pull from Supabase (authoritative)
-    loadAdminFromCloud();
+    applyAdminSettings(adminSettings); // apply defaults immediately
+    loadAdminFromCloud();              // then pull authoritative values from Supabase
 }
 async function loadAdminFromCloud() {
     if (!sbClient) return;
@@ -1357,7 +1355,6 @@ async function loadAdminFromCloud() {
         const {data,error} = await sbClient.from('projects').select('data').eq('id','__admin_settings__').single();
         if (error || !data?.data) return;
         const s = data.data;
-        localStorage.setItem('mico_admin', JSON.stringify(s));
         applyAdminSettings(s);
         laborDays.forEach(d => recalcDay(d.id));
         recalc();
@@ -1388,7 +1385,6 @@ async function saveAdminSettings(silent = false) {
         exclusions:       adminSettings.exclusions       || [...DEFAULT_EXCLUSIONS],
         templateLibrary:  adminSettings.templateLibrary  || [...DEFAULT_TEMPLATE_LIBRARY]
     };
-    localStorage.setItem('mico_admin', JSON.stringify(adminSettings));
     $('laborMarkup').value    = parseFloat(adminSettings.laborMarkup).toFixed(2);
     $('materialMarkup').value = parseFloat(adminSettings.materialMarkup).toFixed(2);
     $('subMarkup').value      = parseFloat(adminSettings.subMarkup).toFixed(2);
@@ -1444,8 +1440,8 @@ function snapshot() {
     };
 }
 
-function localProjects()      { return JSON.parse(localStorage.getItem('mico_projects')||'[]'); }
-function saveLocals(projects) { localStorage.setItem('mico_projects',JSON.stringify(projects)); }
+function localProjects()      { return cloudProjects; }
+function saveLocals(projects) { cloudProjects = projects; }
 
 // ── auto-save timer
 let _autoSaveTimer = null;
@@ -1560,28 +1556,16 @@ const safe  = s  => (s||'Quote').replace(/[^a-zA-Z0-9_\- ]/g,'').replace(/\s+/g,
 // CLOUD SYNC — PULL
 // ═══════════════════════════════════════
 async function syncFromCloud() {
-    renderHistoryList(); // show local immediately
-    if (!sbClient) return; // offline, local only
+    renderHistoryList(); // show current state immediately
+    if (!sbClient) return;
     try {
         const {data,error}=await sbClient.from('projects').select('id,name,data,updated_at').order('updated_at',{ascending:false});
         if (error) throw error;
-        if (data && data.length>0) {
-            // Merge cloud into localStorage — cloud wins on conflict (newer updated_at)
-            let local=localProjects();
-            data.forEach(row=>{
-                if (!row.data) return;
-                const p={...row.data, id:row.id, name:row.name};
-                const idx=local.findIndex(l=>l.id===p.id);
-                if (idx>=0) {
-                    const localNewer = new Date(local[idx].updatedAt||0) > new Date(row.updated_at||0);
-                    if (!localNewer) local[idx]=p;
-                } else {
-                    local.unshift(p);
-                }
-            });
-            // Sort by updatedAt desc
-            local.sort((a,b)=>new Date(b.updatedAt||b.createdAt||0)-new Date(a.updatedAt||a.createdAt||0));
-            saveLocals(local);
+        if (data) {
+            // Supabase is the source of truth — load directly, skip internal records
+            cloudProjects = data
+                .filter(row => row.id !== '__admin_settings__' && row.data)
+                .map(row => ({...row.data, id:row.id, name:row.name}));
             renderHistoryList();
         }
     } catch(e) {
@@ -1685,7 +1669,6 @@ function selectHistory(id) {
 
 function confirmDeleteHistory(id) {
     confirm2('Delete this quote?','This cannot be undone.', async ()=>{
-        // Remove from localStorage immediately
         saveLocals(localProjects().filter(p=>p.id!==id));
         if (selectedHistId===id) {
             selectedHistId=null;
@@ -2191,7 +2174,6 @@ async function buildProposal() {
 
     if (customExcls.length > 0) {
         adminSettings.exclusions = [...(adminSettings.exclusions||[]), ...customExcls];
-        localStorage.setItem('mico_admin', JSON.stringify(adminSettings));
         renderAdminExclusions();
         if (sbClient) sbClient.from('projects').upsert({ id:'__admin_settings__', name:'__admin_settings__', data:adminSettings, updated_at:new Date().toISOString() });
     }
@@ -2451,37 +2433,11 @@ function toast(msg,type='') {
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
-async function uploadLocalToCloud() {
-    if (!sbClient) return;
-    const local = localProjects();
-    if (!local.length) return;
-    try {
-        // Get all IDs already in Supabase
-        const {data:existing,error} = await sbClient.from('projects').select('id,updated_at');
-        if (error) throw error;
-        const cloudMap = {};
-        (existing||[]).forEach(r => cloudMap[r.id] = r.updated_at);
-        // Upload any local quote not in cloud, or newer locally
-        const toUpload = local.filter(p => {
-            if (p.id === '__admin_settings__') return false; // not a real quote
-            if (!cloudMap[p.id]) return true; // not in cloud at all
-            const localTime = new Date(p.updatedAt || p.createdAt || 0);
-            const cloudTime = new Date(cloudMap[p.id] || 0);
-            return localTime > cloudTime;
-        });
-        if (!toUpload.length) return;
-        const rows = toUpload.map(p => ({id:p.id, name:p.name||'Untitled', data:p, updated_at:p.updatedAt||p.createdAt||new Date().toISOString()}));
-        const {error:upErr} = await sbClient.from('projects').upsert(rows);
-        if (upErr) throw upErr;
-        console.log(`Uploaded ${toUpload.length} local quote(s) to Supabase`);
-    } catch(e) { console.error('uploadLocalToCloud error:', e); }
-}
-
 function init() {
     $('h_date').value=today();
-    loadAdminSettings();
     initSupabase();
-    uploadLocalToCloud(); // push any local quotes to cloud on startup
+    loadAdminSettings();
+    syncFromCloud(); // pull all cloud quotes on startup
     // trigger auto-save on any header or name change
     ['h_name','h_address','h_location','h_jobloc','h_wo','h_attn','h_date','h_description']
         .forEach(id=>{ const el=$(id); if(el) el.addEventListener('input',scheduleAutoSave); });
