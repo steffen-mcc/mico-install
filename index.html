@@ -155,9 +155,6 @@
         .del-btn { background:none; border:none; color:var(--silver-mid); cursor:pointer; font-size:18px; padding:3px 7px; border-radius:5px; transition:all .15s; line-height:1; }
         .del-btn:hover { color:var(--red); background:rgba(192,57,43,.08); }
 
-        /* ── DAY HEADER ROW ── */
-
-
         /* ── OT BREAKDOWN TOOLTIP ── */
         .ot-breakdown { font-size:10px; color:var(--ot); font-weight:600; white-space:nowrap; }
 
@@ -1704,7 +1701,7 @@ function previewCostSheet() {
     const h = getHeader();
     const s = getSettings();
     const thresh = adminSettings.otThreshold || 8;
-    const he = v => (v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const he = esc;
 
     // ── CALCULATIONS ──────────────────────────────────────────────────────────
     const mc = materialItems.reduce((a,i)=>a+(parseFloat(i.cost)||0),0);
@@ -2029,96 +2026,6 @@ body{font-family:'Inter',sans-serif;font-size:10pt;color:#1c2333;background:#e8e
     toast('Cost sheet opened in new tab','ok');
 }
 
-// ── LEGACY jsPDF helpers (kept for reference, no longer called) ──────────────
-function _buildPDF_legacy() {
-    const {jsPDF}=window.jspdf;
-    const doc=new jsPDF({orientation:'landscape',unit:'pt',format:'letter'});
-    const h=getHeader(), s=getSettings(), thresh=adminSettings.otThreshold||8;
-    const mc=materialItems.reduce((a,i)=>a+(parseFloat(i.cost)||0),0);
-    const lc=laborDays.reduce((a,d)=>{
-        const t=parseFloat(d.techs)||1,hrs=parseFloat(d.hours)||0,rt=parseFloat(d.costPerHr)||0;
-        const reg=d.allOT?0:Math.min(hrs,thresh)*t, ot=d.allOT?(hrs*t):Math.max(0,hrs-thresh)*t;
-        return a+(reg*rt)+(ot*rt*1.5);
-    },0);
-    const sc=subItems.reduce((a,i)=>a+(parseFloat(i.cost)||0),0);
-    const ms=s.materialMarkup>0?mc/s.materialMarkup:0, ls=s.laborMarkup>0?lc/s.laborMarkup:0, ss=s.subMarkup>0?sc/s.subMarkup:0;
-    const tx=(ms+ls+ss)*(s.taxRate/100), gt=ms+ls+ss+tx, W=792;
-
-    doc.setFillColor(13,34,71); doc.rect(0,0,W,52,'F');
-    doc.setFillColor(200,169,74); doc.rect(0,48,W,4,'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(17); doc.setFont('helvetica','bold'); doc.text('MICO COOLING CORP',24,22);
-    doc.setFontSize(10); doc.setFont('helvetica','normal'); doc.text('Project Cost Sheet',24,38);
-    doc.text(h.wo ? `WO# ${h.wo}` : '',W-20,22,{align:'right'});
-    doc.text(h.date||'',W-20,36,{align:'right'});
-
-    doc.setTextColor(30,40,60);
-    const info=[['Client:',h.name],['Address:',h.address],['Location:',h.location],['MICO WO#:',h.wo],['Attn:',h.attn],['Date:',h.date]];
-    let y=72;
-    info.forEach(([l,v],i)=>{ const x=24+(i%3)*258,yy=y+Math.floor(i/3)*16; doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.text(l,x,yy); doc.setFont('helvetica','normal'); doc.text(v||'',x+56,yy); });
-    if (h.jobloc) { doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.text('Job Location:',24,y+32); doc.setFont('helvetica','normal'); doc.text(h.jobloc,100,y+32); }
-
-    doc.autoTable({
-        startY:110, head:[['#','Item','Supplier','Cost','Notes']],
-        body:materialItems.map((i,idx)=>[idx+1,i.item,i.supplier,fmt(parseFloat(i.cost)||0),i.notes]),
-        theme:'striped', headStyles:{fillColor:[13,34,71],textColor:255,fontSize:8,fontStyle:'bold'},
-        bodyStyles:{fontSize:8}, alternateRowStyles:{fillColor:[240,244,250]},
-        columnStyles:{0:{cellWidth:20,halign:'center'},3:{halign:'right'}},
-        margin:{left:24,right:24}
-    });
-
-    let ay=doc.lastAutoTable.finalY+14;
-
-    const laborRows=laborDays.map((d,idx)=>{
-        const t=parseFloat(d.techs)||1,hrs=parseFloat(d.hours)||0,rt=parseFloat(d.costPerHr)||0;
-        const reg=d.allOT?0:Math.min(hrs,thresh)*t, ot=d.allOT?(hrs*t):Math.max(0,hrs-thresh)*t;
-        return [idx+1,d.label+(d.allOT?' ★':''),t,hrs,fmt(rt),reg>0?reg.toFixed(1)+'h':'—',ot>0?ot.toFixed(1)+'h':'—',fmt((reg*rt)+(ot*rt*1.5)),d.notes||''];
-    });
-    doc.autoTable({
-        startY:ay,
-        head:[['#','Day','Techs','Hrs/Tech','Cost/Hr','Reg Hrs','OT Hrs','Total','Notes']],
-        body:laborRows.length>0?laborRows:[['—','No labor added','','','','','','','']],
-        theme:'striped',
-        headStyles:{fillColor:[26,58,107],textColor:255,fontSize:8,fontStyle:'bold'},
-        bodyStyles:{fontSize:8},
-        columnStyles:{0:{cellWidth:20,halign:'center'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right',textColor:[217,119,6]},7:{halign:'right',fontStyle:'bold'}},
-        margin:{left:24,right:24}
-    });
-    ay=doc.lastAutoTable.finalY+14;
-
-    if (subItems.length > 0) {
-        doc.autoTable({
-            startY:ay,
-            head:[['#','Sub Name','Scope','Cost','Notes']],
-            body:subItems.map((i,idx)=>[idx+1,i.name,i.scope,fmt(parseFloat(i.cost)||0),i.notes]),
-            theme:'striped',
-            headStyles:{fillColor:[74,85,104],textColor:255,fontSize:8,fontStyle:'bold'},
-            bodyStyles:{fontSize:8}, alternateRowStyles:{fillColor:[245,245,250]},
-            columnStyles:{0:{cellWidth:20,halign:'center'},3:{halign:'right'}},
-            margin:{left:24,right:24}
-        });
-        ay=doc.lastAutoTable.finalY+14;
-    }
-
-    doc.autoTable({
-        startY:ay, head:[['','Materials','Labor','Sub-Contractors']],
-        body:[['Cost',fmt(mc),fmt(lc),fmt(sc)],['Mark-Up',s.materialMarkup,s.laborMarkup,s.subMarkup],['Sell',fmt(ms),fmt(ls),fmt(ss)],['Profit',fmt(ms-mc),fmt(ls-lc),fmt(ss-sc)]],
-        theme:'grid', headStyles:{fillColor:[13,34,71],textColor:255,fontSize:8,fontStyle:'bold'},
-        bodyStyles:{fontSize:8}, columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'}},
-        margin:{left:24}, tableWidth:340
-    });
-
-    const gy=doc.lastAutoTable.finalY+14;
-    doc.setFillColor(13,34,71); doc.roundedRect(24,gy,340,40,4,4,'F');
-    doc.setFillColor(200,169,74); doc.roundedRect(24,gy+36,340,4,0,0,'F');
-    doc.setTextColor(255,255,255);
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('GRAND TOTAL',38,gy+15);
-    if(s.taxRate>0){doc.setFont('helvetica','normal');doc.setFontSize(8);doc.text(`incl. ${s.taxRate}% tax (${fmt(tx)})`,38,gy+28);}
-    doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.text(fmt(gt),352,gy+22,{align:'right'});
-    return doc;
-}
-
-// (previewPDF and exportPDF removed — replaced by previewCostSheet above)
 
 // ═══════════════════════════════════════
 // PROPOSAL GENERATOR (docx)
@@ -2196,7 +2103,7 @@ async function buildProposal() {
     const logoSrc = window.document.querySelector('.nav-logo-img')?.src || '';
 
     // ── HTML ESCAPE HELPER ────────────────────────────────────────────────────
-    const he = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const he = esc;
 
     // ── SECTION BOX BUILDER ───────────────────────────────────────────────────
     const section = (title, bodyHtml, dark=false) => `
