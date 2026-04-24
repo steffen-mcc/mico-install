@@ -1356,7 +1356,7 @@ function loadAdminSettings() {
 async function loadAdminFromCloud() {
     if (!sbClient) return;
     try {
-        const {data,error} = await sbClient.from('iq_projects').select('data').eq('id','__admin_settings__').single();
+        const {data,error} = await sbClient.from('iq_settings').select('data').eq('id',1).single();
         if (error || !data?.data) return;
         const s = data.data;
         applyAdminSettings(s);
@@ -1397,9 +1397,8 @@ async function saveAdminSettings(silent = false) {
     // Push to Supabase so all devices get the update
     if (sbClient) {
         try {
-            const {error} = await sbClient.from('iq_projects').upsert({
-                id: '__admin_settings__',
-                name: '__admin_settings__',
+            const {error} = await sbClient.from('iq_settings').upsert({
+                id: 1,
                 data: adminSettings,
                 updated_at: new Date().toISOString()
             });
@@ -1571,7 +1570,7 @@ async function syncFromCloud() {
         if (data) {
             // Supabase is the source of truth — load directly, skip internal records
             cloudProjects = data
-                .filter(row => row.id !== '__admin_settings__' && row.data)
+                .filter(row => row.data)
                 .map(row => ({...row.data, id:row.id, name:row.name}));
             renderHistoryList();
         }
@@ -2092,7 +2091,7 @@ async function buildProposal() {
     if (customExcls.length > 0) {
         adminSettings.exclusions = [...(adminSettings.exclusions||[]), ...customExcls];
         renderAdminExclusions();
-        if (sbClient) sbClient.from('iq_projects').upsert({ id:'__admin_settings__', name:'__admin_settings__', data:adminSettings, updated_at:new Date().toISOString() });
+        if (sbClient) sbClient.from('iq_settings').upsert({ id:1, data:adminSettings, updated_at:new Date().toISOString() });
     }
 
     const dateStr = h.date
